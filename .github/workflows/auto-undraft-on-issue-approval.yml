@@ -1,0 +1,80 @@
+name: Auto undraft PRs on issue approval
+
+# Watches upstream issues for maintainer approval and automatically
+# marks the linked draft PRs as ready for review.
+#
+# Pairs (upstream issue -> upstream draft PR):
+#   #1462 -> #1464  (AI.ask support)
+#   #1463 -> #1465  (MCP reliability)
+
+on:
+  schedule:
+    - cron: "17 * * * *"  # hourly
+  workflow_dispatch:       # manual trigger
+
+permissions:
+  contents: read
+
+jobs:
+  check-approvals:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - issue: 1462
+            pr: 1464
+          - issue: 1463
+            pr: 1465
+    steps:
+      - name: Check for maintainer approval and undraft PR
+        env:
+          GH_TOKEN: ${{ secrets.UPSTREAM_PR_TOKEN }}
+          ISSUE: ${{ matrix.issue }}
+          PR: ${{ matrix.pr }}
+        run: |
+          set -euo pipefail
+
+          # Skip if PR is already out of draft
+          IS_DRAFT=$(gh api repos/abue-ammar/tinycast/pulls/$PR --jq '.draft')
+          if [ "$IS_DRAFT" != "true" ]; then
+            echo "PR #$PR is not a draft, nothing to do."
+            exit 0
+          fi
+
+          # Look for an approval comment from the maintainer on the issue.
+          # Approval keywords: approved, go ahead, lgtm, looks good, :+1: / 👍
+          APPROVED=$(gh api "repos/abue-ammar/tinycast/issues/$ISSUE/comments" --jq '
+            [ .[]
+              | select(.user.login == "abue-ammar")
+              | .body
+              | ascii_downcase
+              | select(
+                  contains("approved") or
+                  contains("go ahead") or
+                  contains("lgtm") or
+                  contains("looks good") or
+                  contains(":+1:") or
+                  contains("👍")
+                )
+            ] | length > 0
+          ')
+
+          if [ "$APPROVED" != "true" ]; then
+            echo "No maintainer approval found on issue #$ISSUE yet."
+            exit 0
+          fi
+
+          echo "Maintainer approved issue #$ISSUE, marking PR #$PR ready for review."
+
+          # Get the PR node id for the GraphQL mutation
+          NODE_ID=$(gh api repos/abue-ammar/tinycast/pulls/$PR --jq '.node_id')
+
+          gh api graphql -f query='
+            mutation($prId: ID!) {
+              markPullRequestReadyForReview(input: {pullRequestId: $prId}) {
+                pullRequest { number, isDraft }
+              }
+            }' -f prId="$NODE_ID" --jq '.data.markPullRequestReadyForReview.pullRequest'
+
+          # Leave a note on the issue linking the now-ready PR
+          gh api "repos/abue-ammar/tinycast/issues/$ISSUE/comments" -f body="PR #$PR is now ready for review. Thanks for the approval!"
