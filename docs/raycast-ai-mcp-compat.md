@@ -125,13 +125,12 @@ Raycast 的 “AI Extensions” 让扩展在 `package.json` 中声明 `tools`，
 所有反馈调用直接丢弃（`ExtensionHostBridge.feedback` 中 `guard activeLaunchType != .background else { return nil }`），
 所以插件在后台调用 `showHUD` / `showToast` 时什么都看不到。
 
-本分支（`hark/background-interval-notify`，已 cherry-pick 到此）改为：
-- 后台 `showHUD(text)` → 显示 Tinycast 的 HUD（与 Raycast 行为一致）；
-- 后台已定型的 `showToast` / `updateToast`（Success/Failure）→ 以 `标题 — 消息` 的 HUD 显示
-  （Raycast 文档：窗口关闭时 toast 回退为 HUD）；`Animated` 不显示，直到它被改成 Success/Failure；
-- `confirmAlert`、窗口操作仍然静默；菜单栏命令的定时刷新仍然静默；
-  通过 `launchCommand({ type: LaunchType.Background })` 启动的 no-view 命令也能显示 HUD。
-- 判定逻辑在 `ExtensionRefreshPolicy.backgroundHUD`，`Tests/ext-refresh-test.swift` 覆盖（Linux 上已通过）。
+本 fork 采用与上游提案一致的精简版（`hark/bg-hud-minimal`，上游 issue #1485）：
+- 后台 `showHUD(text)` → 显示 Tinycast 的 HUD（与 Raycast 行为一致，Mail、Roam Research 等扩展依赖此行为）；
+- `showToast` / `updateToast` / `confirmAlert`、窗口操作仍然静默；菜单栏命令的定时刷新仍然静默；
+- 判定在 `ExtensionRefreshPolicy.surfacesInBackground(feedback:)`，`Tests/ext-refresh-test.swift` 覆盖。
+- 早先更完整的版本（toast 回退为 HUD、`launchCommand` 后台启动也显示）保留在分支
+  `hark/background-interval-notify`，未合入。
 
 注意：
 - 后台调度默认关闭，需**先手动运行一次该命令**，或在 设置 › 扩展 › 该命令 › Background refresh 中打开；
