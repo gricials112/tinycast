@@ -637,8 +637,8 @@ with nothing due costs a comparison. Three guards keep it cheap:
 
 - Intervals clamp to a minute; failures back off exponentially to a day.
 - A tick never preempts a running command — foreground first, the tick waits for the next due.
-- A hung run dies before its successor is due, and a background run shows no toast, HUD, alert or
-  window call, since those would fire on a timer.
+- A hung run dies before its successor is due, and a background run shows no toast, alert or window
+  call, since those would fire on a timer. Its `showHUD` still shows, as Raycast's does.
 
 `ExtensionRefreshPolicy` is where the parsing, due dates and backoff live, driven by
 `Tests/ext-refresh-test.swift`; `Tests/ext-metadata-test.swift` covers the store behind it. Menu-bar

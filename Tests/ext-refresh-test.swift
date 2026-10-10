@@ -216,6 +216,17 @@ struct ExtensionRefreshTests {
             "an open foreground command refuses with a reason")
     }
 
+    static func backgroundShowsOnlyAHUD() {
+        expect(
+            ExtensionRefreshPolicy.surfacesInBackground(feedback: "showHUD"),
+            "a background showHUD reaches the user")
+        for method in ["showToast", "updateToast", "hideToast", "confirmAlert"] {
+            expect(
+                !ExtensionRefreshPolicy.surfacesInBackground(feedback: method),
+                "a background \(method) stays silent")
+        }
+    }
+
     static func main() {
         parseAcceptsAllUnits()
         parseClampsToTheFloor()
@@ -232,6 +243,7 @@ struct ExtensionRefreshTests {
         indicatorNamesTheState()
         launchTypesMatchTheJSContract()
         refreshNowExplainsARefusal()
+        backgroundShowsOnlyAHUD()
 
         print(failures == 0 ? "Extension refresh tests passed" : "\(failures) tests failed")
         exit(failures == 0 ? 0 : 1)

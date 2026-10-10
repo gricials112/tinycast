@@ -6,7 +6,7 @@ import Foundation
 protocol ExtensionHostContext: AnyObject {
     /// The extension whose command is running — the namespace for storage, cache and preferences.
     var activeExtensionName: String? { get }
-    /// Background runs report no UI: toasts, HUDs and dialogs would fire on a timer.
+    /// Background runs report no UI beyond a HUD: toasts and dialogs would fire on a timer.
     var activeLaunchType: ExtensionLaunchType { get }
     var storage: ExtensionStorage { get }
     /// The app a paste would land in — the palette's recorded `previousApp`.
@@ -350,7 +350,10 @@ final class ExtensionHostBridge: ExtensionHostAPI {
 
     private func feedback(method: String, arguments: [RenderValue]) async throws -> Any? {
         guard let context else { throw ExtensionHostError.noActiveExtension }
-        guard context.activeLaunchType != .background else { return nil }
+        guard
+            context.activeLaunchType != .background
+                || ExtensionRefreshPolicy.surfacesInBackground(feedback: method)
+        else { return nil }
         switch method {
         case "showToast":
             guard let payload = arguments.first?.objectValue else { return nil }
