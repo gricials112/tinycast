@@ -6,6 +6,7 @@ name: Auto undraft PRs on issue approval
 # Pairs (upstream issue -> upstream draft PR):
 #   #1462 -> #1464  (AI.ask support)
 #   #1463 -> #1465  (MCP reliability)
+#   #1485 -> #1486  (background HUD/Toast)
 
 on:
   schedule:
@@ -25,6 +26,8 @@ jobs:
             pr: 1464
           - issue: 1463
             pr: 1465
+          - issue: 1485
+            pr: 1486
     steps:
       - name: Check for maintainer approval and undraft PR
         env:
