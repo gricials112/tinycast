@@ -85,6 +85,11 @@ enum ExtensionRefreshPolicy {
         return backgroundEnabled ? .active : .idle
     }
 
+    /// Raycast shows a background command's HUD; a toast, alert or window would fire on a timer.
+    static func surfacesInBackground(feedback method: String) -> Bool {
+        method == "showHUD"
+    }
+
     static func headline(_ message: String) -> String {
         String(message.split(separator: "\n").first ?? "Background refresh failed.")
     }
