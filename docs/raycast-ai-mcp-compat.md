@@ -116,3 +116,28 @@ Raycast 的 “AI Extensions” 让扩展在 `package.json` 中声明 `tools`，
 6. **CLI 路由**：Codex/Claude 等自带工具循环的路由不能直接调用 JS，需要通过本地 MCP 桥（Tinycast 以 stdio
    MCP 服务器的形式暴露扩展工具）才能提供，可作为第二阶段。
 7. **测试**：用 `evals` 中的 `mocks` 驱动 `ai-fixtures` 风格的离线测试，断言 `callsTool`。
+
+## 7. 定时后台命令（`interval`）的通知
+
+**结论：定时调度本身已实现，缺的是“通知”这一环。** 带 `"mode": "no-view"` + `"interval"` 的命令由
+`ExtensionManager` 的单一调度循环在后台运行（`environment.launchType === LaunchType.Background`，
+最小间隔 1 分钟，失败指数退避，状态存 `extension-commands.json`，重启后保留）。但上游把后台运行的
+所有反馈调用直接丢弃（`ExtensionHostBridge.feedback` 中 `guard activeLaunchType != .background else { return nil }`），
+所以插件在后台调用 `showHUD` / `showToast` 时什么都看不到。
+
+本分支（`hark/background-interval-notify`，已 cherry-pick 到此）改为：
+- 后台 `showHUD(text)` → 显示 Tinycast 的 HUD（与 Raycast 行为一致）；
+- 后台已定型的 `showToast` / `updateToast`（Success/Failure）→ 以 `标题 — 消息` 的 HUD 显示
+  （Raycast 文档：窗口关闭时 toast 回退为 HUD）；`Animated` 不显示，直到它被改成 Success/Failure；
+- `confirmAlert`、窗口操作仍然静默；菜单栏命令的定时刷新仍然静默；
+  通过 `launchCommand({ type: LaunchType.Background })` 启动的 no-view 命令也能显示 HUD。
+- 判定逻辑在 `ExtensionRefreshPolicy.backgroundHUD`，`Tests/ext-refresh-test.swift` 覆盖（Linux 上已通过）。
+
+注意：
+- 后台调度默认关闭，需**先手动运行一次该命令**，或在 设置 › 扩展 › 该命令 › Background refresh 中打开；
+  启动器行上的圆点表示已启用，Actions 菜单里有 “Refresh Now” 可立即触发一次后台运行。
+- 有前台扩展命令占用运行时时，定时任务会顺延到下一次。
+- HUD 不是 macOS 通知中心通知：Tinycast 没有接入 `UNUserNotificationCenter`。若插件用
+  `runAppleScript('display notification …')`（经 `child_process` 调用 `osascript`），通知会以
+  “脚本编辑器/osascript” 的名义出现在通知中心，需要在系统设置中允许其通知——此路径未在 Mac 上实测。
+- 尚未在 macOS 上编译/运行验证（Linux 只做了 `-parse` 与纯模型测试）。
