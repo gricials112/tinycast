@@ -6,7 +6,7 @@ import Foundation
 protocol ExtensionHostContext: AnyObject {
     /// The extension whose command is running — the namespace for storage, cache and preferences.
     var activeExtensionName: String? { get }
-    /// Background runs open no window or dialog; their HUDs and settled toasts surface as a HUD.
+    /// Background runs report no UI: toasts, HUDs and dialogs would fire on a timer.
     var activeLaunchType: ExtensionLaunchType { get }
     var storage: ExtensionStorage { get }
     /// The app a paste would land in — the palette's recorded `previousApp`.
@@ -350,9 +350,7 @@ final class ExtensionHostBridge: ExtensionHostAPI {
 
     private func feedback(method: String, arguments: [RenderValue]) async throws -> Any? {
         guard let context else { throw ExtensionHostError.noActiveExtension }
-        guard context.activeLaunchType != .background else {
-            return backgroundFeedback(method: method, arguments: arguments, context: context)
-        }
+        guard context.activeLaunchType != .background else { return nil }
         switch method {
         case "showToast":
             guard let payload = arguments.first?.objectValue else { return nil }
@@ -380,20 +378,6 @@ final class ExtensionHostBridge: ExtensionHostAPI {
         default:
             throw ExtensionHostError.unknown("feedback.\(method)")
         }
-    }
-
-    /// A toast still gets an id, so a later `toast.style = …` reaches `updateToast` and its HUD.
-    private func backgroundFeedback(
-        method: String, arguments: [RenderValue], context: ExtensionHostContext
-    ) -> Any? {
-        let payload = (method == "updateToast" ? arguments[safe: 1] : arguments.first)?.objectValue
-        if let text = ExtensionRefreshPolicy.backgroundHUD(
-            method: method, title: payload?["title"]?.stringValue ?? arguments.first?.stringValue,
-            message: payload?["message"]?.stringValue, toastStyle: payload?["style"]?.stringValue)
-        {
-            context.showHUD(text)
-        }
-        return method == "showToast" ? 0 : nil
     }
 
     // MARK: - System
